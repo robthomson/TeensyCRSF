@@ -5,7 +5,7 @@
 #include "xfire.h"
 #include <inttypes.h>
 
-uint8_t lastRefreshTime;
+uint32_t lastRefreshTime;
 
 
 uint8_t startCrossfire(){
