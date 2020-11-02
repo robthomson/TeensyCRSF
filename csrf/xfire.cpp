@@ -6,10 +6,10 @@
 #include <inttypes.h>
 
 uint32_t lastRefreshTime;
-
+uint8_t frame[CROSSFIRE_FRAME_MAXLEN];
 
 uint8_t startCrossfire(){
-    Serial2.begin(400000, SERIAL_8N1_TXINV | SERIAL_8N1_RXINV);
+    CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE, SERIAL_8N1_TXINV | SERIAL_8N1_RXINV);
     return true;
 }
 
@@ -19,7 +19,6 @@ uint8_t runCrossfire(){
   if(millis() - lastRefreshTime >= REFRESH_INTERVAL)
   {
             lastRefreshTime += REFRESH_INTERVAL;
-            //we run the code here at 4ms
             setupPulsesCrossfire();
            
   }
@@ -27,15 +26,17 @@ uint8_t runCrossfire(){
 }
 
 
+
+
 void setupPulsesCrossfire()
 {
        // uint8_t crossfire[CROSSFIRE_FRAME_MAXLEN];
        // memset(crossfire, 0, sizeof(crossfire));
-        uint8_t frame[CROSSFIRE_FRAME_MAXLEN];
+        //uint8_t frame[CROSSFIRE_FRAME_MAXLEN];
         memset(frame, 0, sizeof(frame));
 
         uint8_t length = createCrossfireChannelsFrame(frame);
-        Serial2.write(frame, length);
+        CROSSFIRE_SERIAL.write(frame, length);
    
 }
 
