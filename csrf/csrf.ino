@@ -20,12 +20,13 @@ void loop() {
 
 */
 
+
 IntervalTimer csrfTimer;
 
 void setup() {
   Serial.begin(9600);
   startCrossfire();  
-  csrfTimer.begin(runCrossfire, REFRESH_INTERVAL);  // blinkLED to run every 0.15 seconds
+  csrfTimer.begin(runCrossfire, (REFRESH_INTERVAL*1000));  //in theory this is converting miliseconds to microseconds
 }
 
 void loop(){
