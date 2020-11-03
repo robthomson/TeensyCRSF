@@ -15,8 +15,11 @@ void setup() {
   Serial.begin(9600);
   startCrossfire();  
 
-  csrfTimer.begin(runCrossfire, (REFRESH_INTERVAL*1000)); 
+  csrfTimer.begin(setupPulsesCrossfire, (REFRESH_INTERVAL*1000)); 
+
 }
+
+
 
 void loop(){
 

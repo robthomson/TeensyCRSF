@@ -9,20 +9,17 @@ uint32_t lastRefreshTime;
 uint8_t frame[CROSSFIRE_FRAME_MAXLEN];
 
 uint8_t startCrossfire(){
-    CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE, SERIAL_8N1_TXINV | SERIAL_8N1_RXINV);
+    //CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE, SERIAL_8N1_TXINV | SERIAL_8N1_RXINV);
+     CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE,SERIAL_8N1_RXINV_TXINV);
+
     return true;
 }
 
 
 uint8_t runCrossfire(){
 
-  if(millis() - lastRefreshTime >= REFRESH_INTERVAL)
-  {
-            lastRefreshTime += REFRESH_INTERVAL;
-            setupPulsesCrossfire();
+         setupPulsesCrossfire();
            
-  }
-  return true;
 }
 
 
@@ -36,6 +33,7 @@ void setupPulsesCrossfire()
         memset(frame, 0, sizeof(frame));
 
         uint8_t length = createCrossfireChannelsFrame(frame);
+        
         CROSSFIRE_SERIAL.write(frame, length);
    
 }

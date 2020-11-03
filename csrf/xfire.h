@@ -9,7 +9,7 @@ void setupPulsesCrossfire();
 uint8_t crc8(const uint8_t * ptr, uint32_t len);
 
 #define CROSSFIRE_CH_BITS           11
-#define CROSSFIRE_CENTER            0x3E0
+#define CROSSFIRE_CENTER            0x3E0  //992
 #define CROSSFIRE_CENTER_CH_OFFSET(ch)            (0)
 
 #define CROSSFIRE_CHANNELS_COUNT  12
