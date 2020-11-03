@@ -16,6 +16,6 @@ uint8_t crc8(const uint8_t * ptr, uint32_t len);
 #define MODULE_ADDRESS              0xEE
 #define CHANNELS_ID                 0x16
 #define CROSSFIRE_FRAME_MAXLEN         64
-#define REFRESH_INTERVAL 16//ms
-#define CROSSFIRE_BAUD_RATE 115200
+#define REFRESH_INTERVAL 16  
+#define CROSSFIRE_BAUD_RATE 115200 //baud
 #define CROSSFIRE_SERIAL Serial3

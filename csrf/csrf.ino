@@ -4,29 +4,18 @@
 #include "RTClib.h"
 #include <Time.h>
 #include <inttypes.h>
+#include "TeensyTimerTool.h"
 
-/*
-
-void setup() {
-  // put your setup code here, to run once:
-   startCrossfire();
-}
+using namespace TeensyTimerTool;
 
 
-void loop() {
-  // put your main code here, to run repeatedly:
-  runCrossfire();
-}
-
-*/
-
-
-IntervalTimer csrfTimer;
+PeriodicTimer csrfTimer;
 
 void setup() {
   Serial.begin(9600);
   startCrossfire();  
-  csrfTimer.begin(runCrossfire, (REFRESH_INTERVAL*1000));  //in theory this is converting miliseconds to microseconds
+
+  csrfTimer.begin(runCrossfire, (REFRESH_INTERVAL*1000)); 
 }
 
 void loop(){
