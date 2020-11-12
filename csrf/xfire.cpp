@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) Rob Thomson
+ *
+ * Based on code named fromn the opentx project
+ *   th9x - http://code.google.com/p/th9x
+ *   er9x - http://code.google.com/p/er9x
+ *   gruvin9x - http://code.google.com/p/gruvin9x
+ *
+ * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+ 
 #include <stdint.h> 
 #include <limits.h>
 #include "RTClib.h"
@@ -5,40 +26,417 @@
 #include "xfire.h"
 #include <inttypes.h>
 
+
+uint32_t crossfireChannels[CROSSFIRE_CHANNELS_COUNT];  //pulate this array with the channel data in the range defined in CROSSFIRE_LOW to CROSSFIRE_HIGH
+double sensorGPSLat;
+double sensorGPSLong;
+float sensorHeading=0;
+float sensorAltitude=0;
+uint32_t sensorSpeed=0;
+uint32_t sensorSats=0;
+float sensorPitch=0;
+float sensorRoll=0;
+float sensorYaw=0;
+double sensorVoltage;
+double sensorCurrent;
+double sensorFuel;
+float sensorVario;
+double sensorRSSI;
+double sensorSNR;
+double sensorTXPWR;
+
 uint32_t lastRefreshTime;
 uint8_t frame[CROSSFIRE_FRAME_MAXLEN];
-
-uint8_t startCrossfire(){
-    //CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE, SERIAL_8N1_TXINV | SERIAL_8N1_RXINV);
-     CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE,SERIAL_8N1_RXINV_TXINV);
-
-    return true;
-}
-
-
-uint8_t runCrossfire(){
-
-         setupPulsesCrossfire();
-           
-}
+uint8_t telemetryRxBuffer[TELEMETRY_RX_PACKET_SIZE];
+uint8_t telemetryRxBufferCount=0;
+uint8_t telemetryRxBufferCountStream=0;
+int crossfireDebug = XFIRE_DEBUG;
 
 
 
+const CrossfireSensor crossfireSensors[] = {
+  {LINK_ID,        0, ZSTR_RX_RSSI1,      UNIT_DB,                0},
+  {LINK_ID,        1, ZSTR_RX_RSSI2,      UNIT_DB,                0},
+  {LINK_ID,        2, ZSTR_RX_QUALITY,    UNIT_PERCENT,           0},
+  {LINK_ID,        3, ZSTR_RX_SNR,        UNIT_DB,                0},
+  {LINK_ID,        4, ZSTR_ANTENNA,       UNIT_RAW,               0},
+  {LINK_ID,        5, ZSTR_RF_MODE,       UNIT_RAW,               0},
+  {LINK_ID,        6, ZSTR_TX_POWER,      UNIT_MILLIWATTS,        0},
+  {LINK_ID,        7, ZSTR_TX_RSSI,       UNIT_DB,                0},
+  {LINK_ID,        8, ZSTR_TX_QUALITY,    UNIT_PERCENT,           0},
+  {LINK_ID,        9, ZSTR_TX_SNR,        UNIT_DB,                0},
+  {BATTERY_ID,     0, ZSTR_BATT,          UNIT_VOLTS,             1},
+  {BATTERY_ID,     1, ZSTR_CURR,          UNIT_AMPS,              1},
+  {BATTERY_ID,     2, ZSTR_CAPACITY,      UNIT_MAH,               0},
+  {BATTERY_ID,     3, ZSTR_BATT_PERCENT,  UNIT_PERCENT,           0},
+  {GPS_ID,         0, ZSTR_GPS,           UNIT_GPS_LATITUDE,      0},
+  {GPS_ID,         0, ZSTR_GPS,           UNIT_GPS_LONGITUDE,     0},
+  {GPS_ID,         2, ZSTR_GSPD,          UNIT_KMH,               1},
+  {GPS_ID,         3, ZSTR_HDG,           UNIT_DEGREE,            3},
+  {GPS_ID,         4, ZSTR_ALT,           UNIT_METERS,            0},
+  {GPS_ID,         5, ZSTR_SATELLITES,    UNIT_RAW,               0},
+  {ATTITUDE_ID,    0, ZSTR_PITCH,         UNIT_RADIANS,           3},
+  {ATTITUDE_ID,    1, ZSTR_ROLL,          UNIT_RADIANS,           3},
+  {ATTITUDE_ID,    2, ZSTR_YAW,           UNIT_RADIANS,           3},
+  {FLIGHT_MODE_ID, 0, ZSTR_FLIGHT_MODE,   UNIT_TEXT,              0},
+  {CF_VARIO_ID,    0, ZSTR_VSPD,          UNIT_METERS_PER_SECOND, 2},
+  {0,              0, "UNKNOWN",          UNIT_RAW,               0},
+};
 
-void setupPulsesCrossfire()
+const CrossfireSensor & getCrossfireSensor(uint8_t id, uint8_t subId)
 {
-       // uint8_t crossfire[CROSSFIRE_FRAME_MAXLEN];
-       // memset(crossfire, 0, sizeof(crossfire));
-        //uint8_t frame[CROSSFIRE_FRAME_MAXLEN];
-        memset(frame, 0, sizeof(frame));
-
-        uint8_t length = createCrossfireChannelsFrame(frame);
-        
-        CROSSFIRE_SERIAL.write(frame, length);
-   
+  if (id == LINK_ID)
+    return crossfireSensors[RX_RSSI1_INDEX+subId];
+  else if (id == BATTERY_ID)
+    return crossfireSensors[BATT_VOLTAGE_INDEX+subId];
+  else if (id == GPS_ID)
+    return crossfireSensors[GPS_LATITUDE_INDEX+subId];
+  else if (id == CF_VARIO_ID)
+    return crossfireSensors[VERTICAL_SPEED_INDEX];
+  else if (id == ATTITUDE_ID)
+    return crossfireSensors[ATTITUDE_PITCH_INDEX+subId];
+  else if (id == FLIGHT_MODE_ID)
+    return crossfireSensors[FLIGHT_MODE_INDEX];
+  else
+    return crossfireSensors[UNKNOWN_INDEX];
 }
 
-//uint8_t createCrossfireChannelsFrame(uint8_t * frame, int16_t * pulses)
+
+void startCrossfire(){                                                   //START THE SERIAL PORT
+     CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE,SERIAL_8N1_RXINV_TXINV);
+}
+
+
+void runCrossfire()
+{
+  if(millis() - lastRefreshTime >= REFRESH_INTERVAL)                //SEND PULSES FOR CONTROL LINK
+  { 
+            lastRefreshTime += REFRESH_INTERVAL;
+            memset(frame, 0, sizeof(frame));
+            uint8_t length = createCrossfireChannelsFrame(frame);
+            CROSSFIRE_SERIAL.write(frame, length);   
+
+  } else {                                                          //RECEIVE TELEMETERY BACK
+         CROSSFIRE_SERIAL.flush();
+        telemetryRxBufferCountStream = CROSSFIRE_SERIAL.available();
+        for (int i = 0; i < telemetryRxBufferCountStream; i++) {
+            processCrossfireTelemetryData(CROSSFIRE_SERIAL.read());
+        }     
+  }
+
+
+}
+
+template<int N>
+bool getCrossfireTelemetryValue(uint8_t index, int32_t & value)
+{
+  bool result = false;
+  uint8_t * byte = &telemetryRxBuffer[index];
+  value = (*byte & 0x80) ? -1 : 0;
+  for (uint8_t i=0; i<N; i++) {
+    value <<= 8;
+    if (*byte != 0xff) {
+      result = true;
+    }
+    value += *byte++;
+  }
+  return result;
+}
+
+
+void processCrossfireTelemetryData(uint8_t data)
+{
+  if (telemetryRxBufferCount == 0 && data != RADIO_ADDRESS) {
+    if(crossfireDebug == 1){
+        Serial.print("[XF] address 0x%02X error ");
+        Serial.println(data);
+    }
+    return;
+  }
+
+  if (telemetryRxBufferCount == 1 && (data < 2 || data > TELEMETRY_RX_PACKET_SIZE-2)) {
+    if(crossfireDebug == 1){
+      Serial.print("[XF] length 0x%02X error ");
+      Serial.println(data);  
+    }  
+    telemetryRxBufferCount = 0;
+    return;
+  }
+
+  if (telemetryRxBufferCount < TELEMETRY_RX_PACKET_SIZE) {
+    telemetryRxBuffer[telemetryRxBufferCount++] = data;
+  } else {
+        if(crossfireDebug == 1){
+            Serial.print("[XF] array size error ");
+            Serial.println(telemetryRxBufferCount);    
+        }    
+    telemetryRxBufferCount = 0;
+  }
+
+ 
+  if (telemetryRxBufferCount > 4) {
+    uint8_t length = telemetryRxBuffer[1];
+    if (length + 2 == telemetryRxBufferCount) {
+      processCrossfireTelemetryFrame();
+      telemetryRxBufferCount = 0;
+   }
+  }
+
+  
+}
+
+void processCrossfireTelemetryFrame(){
+
+    if (!checkCrossfireTelemetryFrameCRC()) {
+          if(crossfireDebug == 1){
+            Serial.println("[XF] CRC error");
+          }   
+    return;
+    }
+
+
+  uint8_t id = telemetryRxBuffer[2];
+  int32_t value;
+
+
+  switch(id) {
+    case CF_VARIO_ID:
+        if(crossfireDebug == 1){
+            Serial.println("VARIO");
+        }
+      if (getCrossfireTelemetryValue<2>(3, value))
+        processCrossfireTelemetryValue(VERTICAL_SPEED_INDEX, value);
+      break;
+
+    case GPS_ID:
+      if (getCrossfireTelemetryValue<4>(3, value)){
+          if(crossfireDebug == 1){
+              Serial.println("LATITUDE");
+          }    
+        processCrossfireTelemetryValue(GPS_LATITUDE_INDEX, value/10);
+      }  
+      if (getCrossfireTelemetryValue<4>(7, value)){
+          if(crossfireDebug == 1){
+            Serial.println("LONGITUDE");        
+          }  
+        processCrossfireTelemetryValue(GPS_LONGITUDE_INDEX, value/10);
+      }  
+      if (getCrossfireTelemetryValue<2>(11, value)){
+           if(crossfireDebug == 1){
+             Serial.println("GROUND SPEED"); 
+           }  
+           processCrossfireTelemetryValue(GPS_GROUND_SPEED_INDEX, value);
+      }
+
+      if (getCrossfireTelemetryValue<2>(13, value)){
+         if(crossfireDebug == 1){
+            Serial.println("HEADING"); 
+         }    
+          processCrossfireTelemetryValue(GPS_HEADING_INDEX, value);
+      }  
+      if (getCrossfireTelemetryValue<2>(15, value)) {
+         if(crossfireDebug == 1){ 
+            Serial.println("ALTITUDE");
+         }
+        processCrossfireTelemetryValue(GPS_ALTITUDE_INDEX,  value - 1000);
+
+      }  
+      if (getCrossfireTelemetryValue<1>(17, value)){
+         if(crossfireDebug == 1){
+            Serial.println("SATELLITES");
+         }
+          processCrossfireTelemetryValue(GPS_SATELLITES_INDEX, value);
+      }  
+      break;
+
+    case BATTERY_ID:
+      if (getCrossfireTelemetryValue<2>(3, value)){
+        if(crossfireDebug == 1){        
+          Serial.println("BATTERY VOLTAGE");
+        }     
+        processCrossfireTelemetryValue(BATT_VOLTAGE_INDEX, value);
+      }  
+      if (getCrossfireTelemetryValue<2>(5, value)){
+       if(crossfireDebug == 1){ 
+          Serial.println("BATTERY CURRENT");
+       }   
+        processCrossfireTelemetryValue(BATT_CURRENT_INDEX, value);
+      }  
+      if (getCrossfireTelemetryValue<3>(7, value)){
+         if(crossfireDebug == 1){ 
+            Serial.println("BATTERY CAPACITY");        
+         } 
+        processCrossfireTelemetryValue(BATT_CAPACITY_INDEX, value);
+      }  
+      if (getCrossfireTelemetryValue<1>(10, value)){
+       if(crossfireDebug == 1){
+        Serial.println("BATTERY REMAINING");     
+       }      
+        processCrossfireTelemetryValue(BATT_REMAINING_INDEX, value);
+      }   
+      break;
+
+    case ATTITUDE_ID:
+      if (getCrossfireTelemetryValue<2>(3, value)){
+         if(crossfireDebug == 1){ 
+          Serial.println("ATTITIDE PITCH"); 
+         } 
+        processCrossfireTelemetryValue(ATTITUDE_PITCH_INDEX, value/10);
+      }  
+      if (getCrossfireTelemetryValue<2>(5, value)){
+        if(crossfireDebug == 1){  
+          Serial.println("ATTITIDE ROLL"); 
+        }
+        processCrossfireTelemetryValue(ATTITUDE_ROLL_INDEX, value/10);
+      }  
+      if (getCrossfireTelemetryValue<2>(7, value)){
+        if(crossfireDebug == 1){        
+         Serial.println("ATTITIDE YAW"); 
+        }
+        processCrossfireTelemetryValue(ATTITUDE_YAW_INDEX, value/10);
+      }  
+      break;
+
+
+    case LINK_ID:
+            if(crossfireDebug == 1){
+                Serial.println("LINK STATS");
+            }    
+            for (unsigned int i=0; i<=TX_SNR_INDEX; i++) {
+              if (getCrossfireTelemetryValue<1>(3+i, value)) {
+                processCrossfireTelemetryValue(i, value);
+                }
+            }
+      
+      break;
+
+     case FLIGHT_MODE_ID:
+      if(crossfireDebug == 1){
+          Serial.println("FLIGHT MODE");
+      }
+      const CrossfireSensor & sensor = crossfireSensors[FLIGHT_MODE_INDEX];
+      for (int i=0; i<min<int>(16, telemetryRxBuffer[1]-2); i+=4) {
+        uint32_t value = *((uint32_t *)&telemetryRxBuffer[3+i]);
+        processCrossfireTelemetryValue(i, value);
+       // setTelemetryValue(PROTOCOL_TELEMETRY_CROSSFIRE, sensor.id, 0, sensor.subId, value, sensor.unit, i);
+       //Serial.println(value);
+      }
+      break;
+  }
+
+  
+}
+
+
+
+void processCrossfireTelemetryValue(uint8_t index, int32_t value)
+{
+  
+  const CrossfireSensor & sensor = crossfireSensors[index];
+   setTelemetryValue(sensor.id, 0, sensor.subId, index, value, sensor.unit, sensor.precision);
+}
+
+
+
+void setTelemetryValue( uint16_t id, uint8_t subId, uint8_t index, uint8_t instance, int32_t value, uint32_t unit, uint32_t prec){
+
+
+              if(crossfireDebug == 1){
+                    Serial.print("ID: ");
+                  Serial.print(id);
+                  Serial.print(" SUBID: ");
+                  Serial.print(subId);
+                  Serial.print(" INDEX: ");
+                  Serial.print(index);
+                  Serial.print(" INSTANCE: ");
+                  Serial.print(instance);
+                  Serial.print(" VALUE ");
+                  Serial.print(value);
+                  Serial.print(" UNIT ");
+                  Serial.print(unit);
+                  Serial.print(" PRECISION ");
+                  Serial.print(prec);
+                  Serial.println(" ");
+              }
+
+
+ static const int32_t power_values[] = { 0, 10, 25, 100, 500, 1000, 2000, 250 };
+
+  switch(id) {
+      case LINK_ID:
+               if(instance == 8 && index == 8){      
+                sensorRSSI = value;
+              }        
+               if(instance == 9 && index == 9){      
+                sensorSNR = value;
+              }    
+               if(instance == 6 && index == 6){       
+                sensorTXPWR = power_values[value];
+              }    
+          break;
+      case CF_VARIO_ID:
+              if(instance == 24 && index == 0){       //lattitude 
+                sensorVario = value;
+              }
+            break;
+      case GPS_ID:
+              //this lat and long is not correct at the moment.  Just a simple conversion to test
+              if(instance == 14 && index == 0){       //lattitude 
+                sensorGPSLat =  (double) value/1000000;
+              }
+              //this lat and long is not correct at the moment.  Just a simple conversion to test
+              if(instance == 15 && index == 0){       //longitude
+                sensorGPSLong = (double) value/1000000;
+              }
+              //altitude  - check this is working as seems slow to respond - may be that its gps alt only
+              if(instance == 18 && index == 4){
+                  sensorAltitude = value;
+              }
+              //Heading
+              if(instance == 17 && index == 3){
+                  sensorHeading = (double) value/10;
+              }
+              //Speed
+              if(instance == 16 && index == 2){
+                  sensorSpeed = value;                            
+              }
+              //Sats
+              if(instance == 19 && index == 5){
+                  sensorSats = value;                            
+              }              
+          break;
+    case ATTITUDE_ID:      
+              //Pitch
+              if(instance == 20 && index == 0){
+                  sensorPitch = (double) value/10;                            
+              }                       
+              //Roll
+              if(instance == 21 && index == 1){
+                  sensorRoll = (double) value/10;                            
+              }   
+              //Yaw
+              if(instance == 22 && index == 2){
+                  sensorYaw = (double) value/10;                            
+              } 
+          break;
+    case BATTERY_ID:
+              //Voltage
+              if(instance == 10 && index == 0){
+                  sensorVoltage =  value;                        
+              } 
+              //current
+              if(instance == 11 && index == 1){
+                  sensorCurrent =  value;                        
+              }                             
+              //fuel
+              if(instance == 13 && index == 3){
+                  sensorFuel =  value;                        
+              }    
+          break;
+  }    
+}
+
+
 uint8_t createCrossfireChannelsFrame(uint8_t * frame)
 {
   uint8_t * buf = frame;
@@ -48,22 +446,29 @@ uint8_t createCrossfireChannelsFrame(uint8_t * frame)
   *buf++ = CHANNELS_ID;
   uint32_t bits = 0;
   uint8_t bitsavailable = 0;
-  for (int i=0; i<CROSSFIRE_CHANNELS_COUNT; i++) {
-    //uint32_t val = limit(0, CROSSFIRE_CENTER + (CROSSFIRE_CENTER_CH_OFFSET(i) * 4) / 5 + (pulses[i] * 4) / 5, 2 * CROSSFIRE_CENTER);
-    //uint32_t val = pulses[i];
-    uint32_t val = CROSSFIRE_CENTER;
-    bits |= val << bitsavailable;
-    bitsavailable += CROSSFIRE_CH_BITS;
-    while (bitsavailable >= 8) {
-      *buf++ = bits;
-      bits >>= 8;
-      bitsavailable -= 8;
-    }
-  }
-  *buf++ = crc8(crc_start, 23);
-  return buf - frame;
-}
 
+
+              for (int i=0; i<CROSSFIRE_CHANNELS_COUNT; i++) {
+            
+                //uint32_t val = CROSSFIRE_CENTER;
+                //uint32_t val = map(exBus.GetChannel(i),EXBUS_LOW,EXBUS_HIGH,CROSSFIRE_LOW,CROSSFIRE_HIGH);
+                uint32_t val = crossfireChannels[i];
+                
+            
+                bits |= val << bitsavailable;
+                bitsavailable += CROSSFIRE_CH_BITS;
+                while (bitsavailable >= 8) {
+                  *buf++ = bits;
+                  bits >>= 8;
+                  bitsavailable -= 8;
+                }
+              }
+              *buf++ = crc8(crc_start, 23);
+
+              return buf - frame;
+            }
+
+       
 
 // CRC8 implementation with polynom = x^8+x^7+x^6+x^4+x^2+1 (0xD5)
 unsigned char crc8tab[256] = {
@@ -109,4 +514,12 @@ uint8_t crc8(const uint8_t * ptr, uint32_t len)
     crc = crc8tab[crc ^ *ptr++] ;
   }
   return crc;
+}
+
+
+bool checkCrossfireTelemetryFrameCRC()
+{
+  uint8_t len = telemetryRxBuffer[1];
+  uint8_t crc = crc8(&telemetryRxBuffer[2], len-1);
+  return (crc == telemetryRxBuffer[len+1]);
 }
