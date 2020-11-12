@@ -44,13 +44,12 @@ extern double sensorTXPWR;
 
 void setup() {
   Serial.begin(9600);
-  startCrossfire();  
+  startCrossfire();  //this invokes the crossfire system
 }
 
 
 
 void loop(){
-     runCrossfire();  //timings are critical on this sort of setup.  avoid any 'delays' in the program code.
 
     //simple access to telemetry using variables as defined above
      Serial.print("Voltage ");
