@@ -23,31 +23,30 @@
 
 //bring in all externals related to crossfire
 extern uint32_t crossfireChannels[CROSSFIRE_CHANNELS_COUNT];  //pulses data
-double sensorGPSLat;
-double sensorGPSLong;
-float sensorHeading=0;
-float sensorAltitude=0;
-uint32_t sensorSpeed=0;
-uint32_t sensorSats=0;
-float sensorPitch=0;
-float sensorRoll=0;
-float sensorYaw=0;
-double sensorVoltage;
-double sensorCurrent;
-double sensorFuel;
-float sensorVario;
-uint32_t  sensor1RSS;
-uint32_t sensor2RSS;
-uint32_t sensorRXQly;
-uint32_t sensorRXSNR; 
-uint32_t sensorAntenna; 
-uint32_t sensorRFMode;
-uint32_t sensorTXPWR;
-uint32_t sensorTXRSSI; 
-uint32_t sensorTXQly;
-uint32_t sensorTXSNR;
-uint32_t sensorCapacity;
-
+extern float sensorVario;
+extern double sensorGPSLat;
+extern double sensorGPSLong;
+extern float sensorAltitude;
+extern float sensorHeading;
+extern uint32_t sensorSpeed;
+extern uint32_t sensorSats;
+extern float sensorPitch;
+extern float sensorRoll;
+extern float sensorYaw;
+extern double sensorVoltage;
+extern double sensorCurrent;
+extern double sensorFuel;
+extern uint32_t  sensor1RSS;
+extern uint32_t sensor2RSS;
+extern uint32_t sensorRXQly;
+extern uint32_t sensorRXSNR; 
+extern uint32_t sensorAntenna; 
+extern uint32_t sensorRFMode;
+extern uint32_t sensorTXPWR;
+extern uint32_t sensorTXRSSI; 
+extern uint32_t sensorTXQly;
+extern uint32_t sensorTXSNR;
+extern uint32_t sensorCapacity;
 
 
 

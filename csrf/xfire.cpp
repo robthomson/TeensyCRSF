@@ -114,21 +114,28 @@ const CrossfireSensor & getCrossfireSensor(uint8_t id, uint8_t subId)
 
 
 void startCrossfire(){                                                   //START THE SERIAL PORT
-     CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE,SERIAL_8N1_RXINV_TXINV);
+     //CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE,SERIAL_8N1_RXINV_TXINV);
+     CROSSFIRE_SERIAL.begin(CROSSFIRE_BAUD_RATE,SERIAL_8N1);     
      csrfTimer.begin(runCrossfire, (REFRESH_INTERVAL*1000)); 
 }
 
 void runCrossfire(){
+
+
+  
             lastRefreshTime += REFRESH_INTERVAL;
             memset(frame, 0, sizeof(frame));
             uint8_t length = createCrossfireChannelsFrame(frame);
             CROSSFIRE_SERIAL.write(frame, length);   
+            CROSSFIRE_SERIAL.flush();
+         
 
-         CROSSFIRE_SERIAL.flush();
-        telemetryRxBufferCountStream = CROSSFIRE_SERIAL.available();
-        for (int i = 0; i < telemetryRxBufferCountStream; i++) {
-            processCrossfireTelemetryData(CROSSFIRE_SERIAL.read());
-        }     
+              telemetryRxBufferCountStream = CROSSFIRE_SERIAL.available();
+              for (int i = 0; i < telemetryRxBufferCountStream; i++) {
+                  processCrossfireTelemetryData(CROSSFIRE_SERIAL.read());
+              }
+            
+     
 }
 
 template<int N>
